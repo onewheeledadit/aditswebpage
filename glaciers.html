@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Glaciers — Aditya Venkataraman</title>
+  <meta name="color-scheme" content="light" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@600;700;800&family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+  <style>
+    .page { position: relative; z-index: 1; flex: 1; max-width: 42rem; margin: 0 auto; padding: clamp(2rem, 6vw, 4rem) 1.25rem 2rem; }
+    .back { display: inline-block; color: var(--ink-soft); text-decoration: none; font-weight: 500; font-size: 1.05rem; padding: 0.4rem 0; margin-bottom: 2rem; border-bottom: 2px solid transparent; }
+    .back:hover, .back:focus-visible { color: var(--ink); border-color: var(--warm); }
+    .page h1 { font-family: "Bricolage Grotesque", sans-serif; font-weight: 800; text-transform: uppercase; letter-spacing: -0.04em; font-size: clamp(2.5rem, 9vw, 5rem); line-height: 0.9; margin: 0 0 1.5rem; }
+    .page p { font-size: clamp(1.05rem, 2.2vw, 1.25rem); line-height: 1.6; color: var(--ink); margin: 0 0 1.25rem; }
+    .page a.ext { color: var(--ink); text-decoration-color: var(--warm); text-underline-offset: 3px; text-decoration-thickness: 2px; }
+    .page h2 { font-family: "Bricolage Grotesque", sans-serif; font-weight: 700; font-size: clamp(1.5rem, 4vw, 2.2rem); letter-spacing: -0.02em; margin: 0 0 0.75rem; }
+    .gallery { display: grid; gap: clamp(1.75rem, 5vw, 2.75rem); margin-top: 2.25rem; }
+    .shot { margin: 0; }
+    .shot img { display: block; width: 100%; height: auto; border-radius: 10px; box-shadow: 0 18px 36px rgba(22, 35, 43, 0.18); background: var(--ice-200); }
+    .shot figcaption { margin-top: 0.65rem; font-style: italic; font-size: 0.92rem; line-height: 1.45; color: var(--ink-soft); }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <a class="back" href="/">← Home</a>
+    <h1>Glaciers</h1>
+    <p>I am interested in researching how glaciers change on a global scale. My research is broadly focused on how emulator models can be used to efficiently model glaciers’ response to climate change. I am interested in Bayesian inference, inverse modeling, machine learning and surrogate models.</p>
+    <div class="gallery">
+    <figure class="shot">
+      <img src="/assets/glaciers/glacier1.webp" alt="Me standing on the ablation zone of Grey Glacier (Patagonia RGI17)" width="990" height="1062" decoding="async" />
+      <figcaption>Me standing on the ablation zone of Grey Glacier (Patagonia RGI17)</figcaption>
+    </figure>
+    <figure class="shot">
+      <img src="/assets/glaciers/glacier2.webp" alt="Icefall from Glacier Bionassay (Alps RGI11)" width="1232" height="1012" loading="lazy" decoding="async" />
+      <figcaption>Icefall from Glacier Bionassay (Alps RGI11)</figcaption>
+    </figure>
+    <figure class="shot">
+      <img src="/assets/glaciers/glacier3.webp" alt="View of Grey Glacier from our little boat (Patagonia RGI17)" width="1234" height="744" loading="lazy" decoding="async" />
+      <figcaption>View of Grey Glacier from our little boat (Patagonia RGI17)</figcaption>
+    </figure>
+    <figure class="shot">
+      <img src="/assets/glaciers/glacier4.webp" alt="Me with looming Glacier Bionassay behind (Alps RGI11)" width="1212" height="1382" loading="lazy" decoding="async" />
+      <figcaption>Me with looming Glacier Bionassay behind (Alps RGI11)</figcaption>
+    </figure>
+    <figure class="shot">
+      <img src="/assets/glaciers/glacier5.webp" alt="Balmaceda Glacier in O’Higgins National Park (Patagonia RGI17)" width="1214" height="880" loading="lazy" decoding="async" />
+      <figcaption>Balmaceda Glacier in O’Higgins National Park (Patagonia RGI17)</figcaption>
+    </figure>
+    <figure class="shot">
+      <img src="/assets/glaciers/glacier6.webp" alt="GLAMACLES Workshop (not a glacier but an awesome opportunity) – excursion in Yellowstone NP (Western Canada/USA RGI 2)" width="764" height="1118" loading="lazy" decoding="async" />
+      <figcaption>GLAMACLES Workshop (not a glacier but an awesome opportunity) – excursion in Yellowstone NP (Western Canada/USA RGI 2)</figcaption>
+    </figure>
+    </div>
+  </main>
+</body>
+</html>
