@@ -25,12 +25,12 @@
 
   --portrait-w: clamp(232px, 38vw, 452px);
 
-  /* shared eye anchor — both portraits are registered to this point.
+  /* shared eye anchor — every pose is registered to this point.
      --eye-gap is half the inter-ocular distance (as % of portrait width);
-     it matches adit2, which is the face shown whenever the emoji are up. */
+     it matches adit1, the face shown whenever the emoji are up. */
   --eye-x: 50%;
-  --eye-y: 41%;
-  --eye-gap: 11%;
+  --eye-y: 40.6%;
+  --eye-gap: 12.5%;
 
   --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
   --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
@@ -91,9 +91,9 @@ body {
   letter-spacing: -0.04em;
   text-transform: uppercase;
   color: var(--ink);
-  /* let the portrait crowd up into the name (scales with the name itself) */
-  margin-bottom: -6rem;
-  margin-bottom: -1.7lh;
+  /* the name sits just above the head — the portrait's transparent headroom
+     tucks under the last line without covering any letters */
+  margin-bottom: calc(var(--portrait-w) * -0.06);
   transition: color 0.35s var(--ease-out);
 }
 .name__line { display: block; }
@@ -153,25 +153,26 @@ body {
   mask-image: linear-gradient(to bottom, #000 82%, transparent 99%);
 }
 /* every pose is pre-registered to the same eye anchor, so swapping is a
-   pure crossfade. adit1 base / adit2 topic / adit3 look-left / adit4 look-right */
-.portrait__img--alt,
+   pure crossfade. base = adit1, left / right / up = the gaze poses */
 .portrait__img--left,
-.portrait__img--right {
+.portrait__img--right,
+.portrait__img--up {
   opacity: 0;
   transition: opacity 0.16s ease;
 }
 
-/* gaze: cursor left / right of the figure — only while no topic is engaged */
+/* gaze: cursor left / right / above the figure — only while no topic is engaged */
 .portrait[data-gaze="left"]:not(.is-active) .portrait__img--base,
-.portrait[data-gaze="right"]:not(.is-active) .portrait__img--base { opacity: 0; }
+.portrait[data-gaze="right"]:not(.is-active) .portrait__img--base,
+.portrait[data-gaze="up"]:not(.is-active) .portrait__img--base { opacity: 0; }
 .portrait[data-gaze="left"]:not(.is-active) .portrait__img--left { opacity: 1; }
 .portrait[data-gaze="right"]:not(.is-active) .portrait__img--right { opacity: 1; }
+.portrait[data-gaze="up"]:not(.is-active) .portrait__img--up { opacity: 1; }
 
-/* topic hover / pin wins over gaze */
-.portrait.is-active .portrait__img--base,
+/* topic hover / pin: back to the base face (emoji pair goes over its eyes) */
 .portrait.is-active .portrait__img--left,
-.portrait.is-active .portrait__img--right { opacity: 0; }
-.portrait.is-active .portrait__img--alt { opacity: 1; }
+.portrait.is-active .portrait__img--right,
+.portrait.is-active .portrait__img--up { opacity: 0; }
 
 /* one emoji over each eye */
 .portrait__eyes {

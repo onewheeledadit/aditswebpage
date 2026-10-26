@@ -4,14 +4,17 @@ A single interactive hero, inspired by [trevornoah.com](https://www.trevornoah.c
 the name, the set `{ Glaciers, Climbing, Puzzles, Professional }`, and a cut-out
 portrait that reacts.
 
-**Four poses, all registered to the same eye position so swaps don't jump:**
+**Poses, all registered to the same eye position so swaps don't jump:**
 
 | pose | when | extra |
 |------|------|-------|
 | `adit1` | resting (cursor over the figure, or touch) | — |
-| `adit2` | a topic word is hovered / focused / tapped | emoji pair drops over the eyes, themed glow |
+| `adit1` | a topic word is hovered / focused / tapped | emoji pair drops over the eyes, themed glow |
 | `adit4` | cursor is anywhere left of the figure | he glances left, toward the cursor |
 | `adit3` | cursor is anywhere right of the figure | he glances right, toward the cursor |
+| `adit5` | cursor is above his head (within the figure's width) | looking up — synthesised from adit1, no photo |
+
+`adit2` (mouth open) is still built but no longer used on the page.
 
 A topic always wins over the gaze. The gaze only runs for a fine pointer with
 motion allowed. Which pose maps to which side is set by the `src` on
@@ -65,7 +68,12 @@ swift scripts/lift_subject.swift adit4.jpeg scripts/_lifted/adit4-cut.png
 
 # 2. detect eyes, register, clean, export  ->  assets/  (png + webp)
 /opt/anaconda3/bin/python3 scripts/build_portraits.py
+
+# 3. derive the looking-up pose from adit1 (moves the irises up)  ->  assets/adit5-cut.*
+/opt/anaconda3/bin/python3 scripts/make_lookup.py
 ```
+
+`LIFT` at the top of `scripts/make_lookup.py` sets how far the eyes roll up.
 
 Poses and per-pose `trim` (head-size match) are listed in `JOBS` at the top of
 `scripts/build_portraits.py`.
@@ -78,7 +86,7 @@ To use different photos: drop in new `aditN` source files, re-run both steps,
 then re-check these knobs in `styles.css :root`:
 
 - `--eye-y` — vertical line the emoji pair sits on (% of portrait height)
-- `--eye-gap` — half the eye spacing (% of portrait width); should match adit2
+- `--eye-gap` — half the eye spacing (% of portrait width); should match adit1
 - `--emoji-size` — glyph size (× portrait width); per-theme overrides live in
   `.portrait[data-theme="…"] .portrait__emoji` along with `--emoji-dy`
 

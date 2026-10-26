@@ -90,11 +90,14 @@
     if (e.key === "Escape" && pinned) togglePin(pinned);
   });
 
-  /* ---- pointer: parallax + look left / right --------------------------- *
-   * With no topic engaged, the figure glances the way the cursor sits:
-   *   cursor left of the figure  -> adit3   cursor right -> adit4   over it -> adit1
-   * A pinned/hovered topic (adit2 + emoji) always wins.
+  /* ---- pointer: parallax + gaze ----------------------------------------- *
+   * With no topic engaged, the figure looks toward the cursor:
+   *   left of the figure -> left pose    right of it -> right pose
+   *   above the head (within the figure's width) -> looking-up pose
+   *   anywhere else -> adit1
+   * A pinned/hovered topic (adit1 + emoji pair) always wins.
    */
+  var HAIR_TOP = 0.04; // top of the hair, as a fraction of the portrait box height
   var fine = window.matchMedia("(pointer: fine)").matches;
   var still = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   if (fine && !still) {
@@ -115,7 +118,11 @@
         portrait.style.transform =
           "translate(" + (dx * 8).toFixed(2) + "px," + (dy * 6).toFixed(2) + "px)";
 
-        var gaze = x < pRect.left ? "left" : x > pRect.right ? "right" : "";
+        var headTop = pRect.top + pRect.height * HAIR_TOP;
+        var gaze = x < pRect.left ? "left"
+                 : x > pRect.right ? "right"
+                 : y < headTop ? "up"
+                 : "";
         if (portrait.dataset.gaze !== gaze) portrait.dataset.gaze = gaze;
       });
     });
