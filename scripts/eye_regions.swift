@@ -1,5 +1,5 @@
 // Print eye-contour and pupil landmarks (pixel coords, top-left origin) as JSON.
-// Used by make_lookup.py to synthesise the "looking up" pose from adit1.
+// Used by compose_lookup.py (jawline seam + skin sampling for the looking-up pose).
 //
 //   swift scripts/eye_regions.swift assets/adit1-cut.png
 
@@ -33,4 +33,5 @@ func pts(_ r: VNFaceLandmarkRegion2D?) -> String {
 
 print("{\"w\":\(Int(W)),\"h\":\(Int(H)),"
     + "\"leftEye\":\(pts(lm.leftEye)),\"rightEye\":\(pts(lm.rightEye)),"
-    + "\"leftPupil\":\(pts(lm.leftPupil)),\"rightPupil\":\(pts(lm.rightPupil))}")
+    + "\"leftPupil\":\(pts(lm.leftPupil)),\"rightPupil\":\(pts(lm.rightPupil)),"
+    + "\"faceContour\":\(pts(lm.faceContour))}")

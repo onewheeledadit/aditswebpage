@@ -1,0 +1,140 @@
+#!/usr/bin/env python3
+"""
+Build the "looking up" pose (assets/adit5-cut) from the adit5 photo.
+
+The adit5 photo is a close crop in a hoodie; every other pose wears the grey
+t-shirt. So the head from adit5 is placed on the neck + t-shirt of adit3 (also
+a looking-up pose, so the neck angle matches). Both are already registered to
+the shared eye anchor by build_portraits.py, and their chins land within a few
+pixels of each other, so the seam can follow adit5's jawline.
+
+  head  = adit5 above its jawline, minus any hoodie fabric
+  body  = adit3 (neck + t-shirt), with the neck skin nudged toward adit5's tone
+
+Run after build_portraits.py:
+  /opt/anaconda3/bin/python3 scripts/compose_lookup.py
+"""
+from __future__ import annotations
+
+import json
+import pathlib
+import subprocess
+
+import numpy as np
+from PIL import Image
+from scipy import ndimage
+
+ROOT = pathlib.Path(__file__).resolve().parent.parent
+HEAD = ROOT / "scripts" / "_lifted" / "adit5-head.png"
+BODY = ROOT / "assets" / "adit3-cut.png"
+OUT = ROOT / "assets" / "adit5-cut"
+
+JAW_DROP = 4        # px below the detected jawline that still counts as head
+SEAM_FEATHER = 1.6  # px of blur on the head mask edge
+TONE_BLEND = 0.9    # how far to warm the head toward the body photo's skin tone
+
+
+def landmarks(path: pathlib.Path) -> dict:
+    out = subprocess.run(
+        ["swift", str(ROOT / "scripts" / "eye_regions.swift"), str(path)],
+        capture_output=True, text=True, check=True,
+    )
+    return json.loads([l for l in out.stdout.splitlines() if l.startswith("{")][-1])
+
+
+def jaw_curve(contour: np.ndarray, w: int) -> tuple[np.ndarray, int, int]:
+    """y of the jawline for each x inside the face contour (NaN outside)."""
+    c = contour[np.argsort(contour[:, 0])]
+    x0, x1 = int(np.ceil(c[0, 0])), int(np.floor(c[-1, 0]))
+    jaw = np.full(w, np.nan)
+    xs = np.arange(x0, x1 + 1)
+    # the contour runs ear -> chin -> ear, so for each x take its lowest point
+    lower = {}
+    for x, y in contour:
+        k = int(round(x))
+        lower[k] = max(lower.get(k, -1), y)
+    kx = np.array(sorted(lower)); ky = np.array([lower[k] for k in kx])
+    jaw[xs] = np.interp(xs, kx, ky)
+    return jaw, x0, x1
+
+
+def skin_mask(rgb: np.ndarray) -> np.ndarray:
+    r, g, b = rgb[..., 0], rgb[..., 1], rgb[..., 2]
+    return (r > g + 8) & (g > b - 6) & (r > 60) & (r < 245)
+
+
+def main() -> None:
+    head = np.asarray(Image.open(HEAD).convert("RGBA")).astype(float)
+    body = np.asarray(Image.open(BODY).convert("RGBA")).astype(float)
+    h, w, _ = head.shape
+    yy, xx = np.mgrid[0:h, 0:w]
+
+    lm = landmarks(HEAD)
+    contour = np.asarray(lm["faceContour"], float)
+    jaw, jx0, jx1 = jaw_curve(contour, w)
+    ear_y = contour[[0, -1], 1].mean()
+
+    # --- head mask -------------------------------------------------------
+    h_rgb, h_a = head[..., :3], head[..., 3] / 255.0
+    below_jaw = np.zeros((h, w), bool)
+    cols = np.arange(jx0, jx1 + 1)
+    below_jaw[:, cols] = yy[:, cols] > (jaw[cols] + JAW_DROP)[None, :]
+
+    # hoodie: grey, low-chroma fabric below ear level, connected to the frame
+    chroma = h_rgb.max(axis=2) - h_rgb.min(axis=2)
+    lum = h_rgb.mean(axis=2)
+    fabric = (h_a > 0.5) & (chroma < 28) & (lum > 55) & (lum < 215) & (yy > ear_y + 30)
+    fabric &= below_jaw | (xx < jx0) | (xx > jx1)  # beside or below the jaw
+    lbl, n = ndimage.label(fabric)
+    hood = np.zeros_like(fabric)
+    if n:
+        sizes = ndimage.sum(fabric, lbl, index=np.arange(1, n + 1))
+        for i, s in enumerate(sizes, 1):
+            if s > 150:
+                hood |= lbl == i
+    hood = ndimage.binary_dilation(hood, iterations=3)
+    # anything below the bottom of the original crop beside the jaw is hood too
+    lowest_face = np.nanmax(jaw)
+    hood |= (yy > ear_y + 60) & ((xx < jx0) | (xx > jx1)) & (h_a > 0.5) & ~skin_mask(h_rgb)
+
+    keep = (h_a > 0.02) & ~below_jaw & ~hood
+    keep = ndimage.binary_opening(keep, iterations=1)
+    lbl, n = ndimage.label(keep)
+    if n > 1:
+        sizes = ndimage.sum(keep, lbl, index=np.arange(1, n + 1))
+        keep = lbl == (int(np.argmax(sizes)) + 1)
+    m = ndimage.gaussian_filter(keep.astype(float), SEAM_FEATHER) * h_a
+
+    # --- head: match its skin tone to the body photo's lighting ------------
+    # adit5 was shot in cooler, dimmer light; a per-channel gain measured on
+    # cheek/forehead skin warms it to match the other poses (dark hair stays dark)
+    b_rgb, b_a = body[..., :3], body[..., 3] / 255.0
+    b_contour = np.asarray(landmarks(BODY)["faceContour"], float)
+    b_jaw, bx0, bx1 = jaw_curve(b_contour, w)
+
+    def face_skin(rgb, a, jaw_line, x0, x1, top):
+        inside = np.zeros((h, w), bool)
+        c = np.arange(x0 + 25, x1 - 25)
+        inside[:, c] = (yy[:, c] < jaw_line[c][None, :] - 25) & (yy[:, c] > top)
+        return inside & skin_mask(rgb) & (a > 0.9)
+
+    eye_top = lm["leftEye"][0][1] - 60
+    src = face_skin(h_rgb, h_a, jaw, jx0, jx1, eye_top) & keep
+    dst = face_skin(b_rgb, b_a, b_jaw, bx0, bx1, eye_top)
+    gain = b_rgb[dst].mean(axis=0) / h_rgb[src].mean(axis=0)
+    gain = 1 + (gain - 1) * TONE_BLEND
+    h_rgb = (h_rgb * gain[None, None, :]).clip(0, 255)
+    print("head tone gain", np.round(gain, 3), f"(skin px: head {src.sum()}, body {dst.sum()})")
+
+    # --- composite: head over body -----------------------------------------
+    out_a = m + b_a * (1 - m)
+    out_rgb = (h_rgb * m[..., None] + b_rgb * (b_a * (1 - m))[..., None]) / np.maximum(out_a, 1e-6)[..., None]
+    out = np.dstack([out_rgb, out_a * 255]).clip(0, 255).astype(np.uint8)
+    im = Image.fromarray(out, "RGBA")
+    im.save(OUT.with_suffix(".png"), optimize=True)
+    im.save(OUT.with_suffix(".webp"), quality=88, method=6)
+    print("wrote", OUT.with_suffix(".png").name, "+ .webp")
+
+
+if __name__ == "__main__":
+    main()

@@ -39,12 +39,16 @@ OUT_MAX_EDGE = 1000
 
 # `trim` shrinks the head about the eye midpoint (eyes stay locked) so every
 # pose reads at a similar overall size on swap — adit2 is shot closer.
-#   adit1 = base    adit2 = topic hover    adit3 = look left    adit4 = look right
+#   adit1 = base    adit2 = (unused)    adit3 / adit4 = look right / left
+#   adit5 = look up — registered to an intermediate file; compose_lookup.py then
+#           puts its head on the t-shirt body (the photo has a hoodie)
 JOBS = [
     {"src": "adit1.jpeg", "lifted": "adit1-cut.png", "out": "adit1-cut.png", "trim": 1.0},
     {"src": "adit2.png", "lifted": "adit2-cut.png", "out": "adit2-cut.png", "trim": 0.92},
     {"src": "adit3.jpeg", "lifted": "adit3-cut.png", "out": "adit3-cut.png", "trim": 1.0},
     {"src": "adit4.jpeg", "lifted": "adit4-cut.png", "out": "adit4-cut.png", "trim": 1.0},
+    {"src": "adit5.png", "lifted": "adit5-cut.png", "out": "adit5-head.png", "trim": 1.0,
+     "dir": LIFTED},
 ]
 
 
@@ -92,17 +96,20 @@ def register(lifted_path: pathlib.Path, eyes: dict, trim: float = 1.0) -> Image.
                         resample=Image.BICUBIC)
 
 
-def finish(im: Image.Image, out_name: str) -> None:
+def finish(im: Image.Image, out_name: str, out_dir: pathlib.Path = ASSETS) -> None:
     if max(im.size) > OUT_MAX_EDGE:
         k = OUT_MAX_EDGE / max(im.size)
         im = im.resize((round(im.width * k), round(im.height * k)), Image.LANCZOS)
-    ASSETS.mkdir(exist_ok=True)
-    im.save(ASSETS / out_name, optimize=True)
-    webp_name = out_name.rsplit(".", 1)[0] + ".webp"
-    im.save(ASSETS / webp_name, quality=88, method=6)
-    png_kb = (ASSETS / out_name).stat().st_size // 1024
-    webp_kb = (ASSETS / webp_name).stat().st_size // 1024
-    print(f"  {out_name}: {im.width}x{im.height}  (png {png_kb} KB / webp {webp_kb} KB)")
+    out_dir.mkdir(exist_ok=True)
+    im.save(out_dir / out_name, optimize=True)
+    png_kb = (out_dir / out_name).stat().st_size // 1024
+    if out_dir == ASSETS:
+        webp_name = out_name.rsplit(".", 1)[0] + ".webp"
+        im.save(ASSETS / webp_name, quality=88, method=6)
+        print(f"  {out_name}: {im.width}x{im.height}  (png {png_kb} KB / webp "
+              f"{(ASSETS / webp_name).stat().st_size // 1024} KB)")
+    else:
+        print(f"  {out_dir.name}/{out_name}: {im.width}x{im.height}  (intermediate)")
 
     stem = out_name.split("-")[0]
     for rgb, tag in [((210, 226, 234), "ice"), ((15, 20, 26), "dark")]:
@@ -116,7 +123,8 @@ if __name__ == "__main__":
     for job in JOBS:
         eyes = eye_points(job["src"])
         print(f"{job['src']}: eyes {eyes['eyeL']} {eyes['eyeR']}  trim={job['trim']}")
-        finish(register(LIFTED / job["lifted"], eyes, job["trim"]), job["out"])
+        finish(register(LIFTED / job["lifted"], eyes, job["trim"]), job["out"],
+               job.get("dir", ASSETS))
 
     scale = OUT_MAX_EDGE / max(CANVAS_W, CANVAS_H)
     print(

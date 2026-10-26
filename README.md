@@ -12,7 +12,7 @@ portrait that reacts.
 | `adit1` | a topic word is hovered / focused / tapped | emoji pair drops over the eyes, themed glow |
 | `adit4` | cursor is anywhere left of the figure | he glances left, toward the cursor |
 | `adit3` | cursor is anywhere right of the figure | he glances right, toward the cursor |
-| `adit5` | cursor is above his head (within the figure's width) | looking up — synthesised from adit1, no photo |
+| `adit5` | cursor is above his head (within the figure's width) | looking up — adit5's head on the t-shirt body from adit3 |
 
 `adit2` (mouth open) is still built but no longer used on the page.
 
@@ -65,15 +65,19 @@ swift scripts/lift_subject.swift adit1.jpeg scripts/_lifted/adit1-cut.png
 swift scripts/lift_subject.swift adit2.png  scripts/_lifted/adit2-cut.png
 swift scripts/lift_subject.swift adit3.jpeg scripts/_lifted/adit3-cut.png
 swift scripts/lift_subject.swift adit4.jpeg scripts/_lifted/adit4-cut.png
+swift scripts/lift_subject.swift adit5.png  scripts/_lifted/adit5-cut.png
 
 # 2. detect eyes, register, clean, export  ->  assets/  (png + webp)
+#    (adit5 goes to scripts/_lifted/adit5-head.png for step 3)
 /opt/anaconda3/bin/python3 scripts/build_portraits.py
 
-# 3. derive the looking-up pose from adit1 (moves the irises up)  ->  assets/adit5-cut.*
-/opt/anaconda3/bin/python3 scripts/make_lookup.py
+# 3. looking-up pose: adit5's head on adit3's neck + grey t-shirt  ->  assets/adit5-cut.*
+/opt/anaconda3/bin/python3 scripts/compose_lookup.py
 ```
 
-`LIFT` at the top of `scripts/make_lookup.py` sets how far the eyes roll up.
+The adit5 photo was taken in a hoodie and cooler light, so `compose_lookup.py`
+cuts the head off along the jawline, drops the hoodie, puts it on adit3's body,
+and warms the skin to match (`TONE_BLEND`).
 
 Poses and per-pose `trim` (head-size match) are listed in `JOBS` at the top of
 `scripts/build_portraits.py`.
