@@ -30,6 +30,7 @@ BODY = ROOT / "assets" / "adit3-cut.png"
 OUT = ROOT / "assets" / "adit5-cut"
 
 JAW_DROP = 4        # px below the detected jawline that still counts as head
+LOBE_FRAC = 0.42    # ear-lobe level, as a fraction of the eye->chin height above the chin
 SEAM_FEATHER = 1.6  # px of blur on the head mask edge
 TONE_BLEND = 0.9    # how far to warm the head toward the body photo's skin tone
 
@@ -77,25 +78,30 @@ def main() -> None:
     # --- head mask -------------------------------------------------------
     h_rgb, h_a = head[..., :3], head[..., 3] / 255.0
     below_jaw = np.zeros((h, w), bool)
-    cols = np.arange(jx0, jx1 + 1)
-    below_jaw[:, cols] = yy[:, cols] > (jaw[cols] + JAW_DROP)[None, :]
+    # only cut along the lower jaw / chin; up by the cheeks the contour sits
+    # inside the real silhouette and a geometric cut would slice the face
+    eye_y = np.mean([p[1] for p in lm["leftEye"] + lm["rightEye"]])
+    chin = np.nanmax(jaw)
+    lobe_y = chin - LOBE_FRAC * (chin - eye_y)            # roughly ear-lobe level
+    # cut line: follows the jaw around the chin, flattens out at ear-lobe level
+    # beside the face (below that it is all hood / neck, which adit3 supplies)
+    cut_y = np.fmax(jaw + JAW_DROP, lobe_y - 10)          # NaN outside the face -> lobe level
+    below_jaw = yy > cut_y[None, :]
 
-    # hoodie: grey, low-chroma fabric below ear level, connected to the frame
+    # hoodie: grey, low-chroma fabric below ear level that runs off the
+    # bottom of the original photo (the photo is cropped right at the chin)
     chroma = h_rgb.max(axis=2) - h_rgb.min(axis=2)
     lum = h_rgb.mean(axis=2)
+    crop_bottom = np.where((h_a > 0.5).any(axis=1))[0].max()
     fabric = (h_a > 0.5) & (chroma < 28) & (lum > 55) & (lum < 215) & (yy > ear_y + 30)
-    fabric &= below_jaw | (xx < jx0) | (xx > jx1)  # beside or below the jaw
     lbl, n = ndimage.label(fabric)
     hood = np.zeros_like(fabric)
-    if n:
-        sizes = ndimage.sum(fabric, lbl, index=np.arange(1, n + 1))
-        for i, s in enumerate(sizes, 1):
-            if s > 150:
-                hood |= lbl == i
+    for i, sl in enumerate(ndimage.find_objects(lbl), 1):
+        if sl is not None and sl[0].stop >= crop_bottom - 4 and (lbl[sl] == i).sum() > 150:
+            hood |= lbl == i
     hood = ndimage.binary_dilation(hood, iterations=3)
-    # anything below the bottom of the original crop beside the jaw is hood too
-    lowest_face = np.nanmax(jaw)
-    hood |= (yy > ear_y + 60) & ((xx < jx0) | (xx > jx1)) & (h_a > 0.5) & ~skin_mask(h_rgb)
+    # beside the jaw, below the lobes, anything that is not skin is hood too
+    hood |= (yy > lobe_y) & ((xx < jx0) | (xx > jx1)) & (h_a > 0.5) & ~skin_mask(h_rgb)
 
     keep = (h_a > 0.02) & ~below_jaw & ~hood
     keep = ndimage.binary_opening(keep, iterations=1)
@@ -125,6 +131,15 @@ def main() -> None:
     gain = 1 + (gain - 1) * TONE_BLEND
     h_rgb = (h_rgb * gain[None, None, :]).clip(0, 255)
     print("head tone gain", np.round(gain, 3), f"(skin px: head {src.sum()}, body {dst.sum()})")
+
+    # --- body: drop adit3's ears ------------------------------------------
+    # adit3's ears sit lower than adit5's and would peek out underneath as a
+    # second ear; its jaw and neck stay as filler under adit5's head
+    b_chin = np.nanmax(b_jaw)
+    b_ear_top = b_contour[[0, -1], 1].mean()
+    b_lobe = b_chin - LOBE_FRAC * (b_chin - eye_y)
+    ears = (yy > b_ear_top - 30) & (yy < b_lobe + 12) & ((xx < bx0 + 16) | (xx > bx1 - 16))
+    b_a = b_a * (1 - ndimage.gaussian_filter(ears.astype(float), 1.5))
 
     # --- composite: head over body -----------------------------------------
     out_a = m + b_a * (1 - m)
