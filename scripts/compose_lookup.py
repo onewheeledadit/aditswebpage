@@ -31,6 +31,9 @@ OUT = ROOT / "assets" / "adit5-cut"
 
 JAW_DROP = 4        # px below the detected jawline that still counts as head
 LOBE_FRAC = 0.42    # ear-lobe level, as a fraction of the eye->chin height above the chin
+JAW_MARGIN = 8      # px below adit3's detected jawline still treated as its face (stubble edge)
+JAW_SMOOTH = 7      # px of smoothing on the detected jawlines
+NECK_SPAN = 60      # px of adit3's neck that get stretched up to meet adit5's jaw
 SEAM_FEATHER = 1.6  # px of blur on the head mask edge
 TONE_BLEND = 0.9    # how far to warm the head toward the body photo's skin tone
 
@@ -55,7 +58,8 @@ def jaw_curve(contour: np.ndarray, w: int) -> tuple[np.ndarray, int, int]:
         k = int(round(x))
         lower[k] = max(lower.get(k, -1), y)
     kx = np.array(sorted(lower)); ky = np.array([lower[k] for k in kx])
-    jaw[xs] = np.interp(xs, kx, ky)
+    # the contour is only 17 points; smooth the straight segments into a curve
+    jaw[xs] = ndimage.gaussian_filter1d(np.interp(xs, kx, ky), JAW_SMOOTH, mode="nearest")
     return jaw, x0, x1
 
 
@@ -103,12 +107,16 @@ def main() -> None:
     # beside the jaw, below the lobes, anything that is not skin is hood too
     hood |= (yy > lobe_y) & ((xx < jx0) | (xx > jx1)) & (h_a > 0.5) & ~skin_mask(h_rgb)
 
-    keep = (h_a > 0.02) & ~below_jaw & ~hood
-    keep = ndimage.binary_opening(keep, iterations=1)
-    lbl, n = ndimage.label(keep)
+    # solid head pixels first; then allow only the soft matte edge that borders
+    # them — the hoodie's own faint outline edge would otherwise survive as a
+    # thin line floating beside the jaw
+    solid = (h_a > 0.5) & ~below_jaw & ~hood
+    solid = ndimage.binary_opening(solid, iterations=1)
+    lbl, n = ndimage.label(solid)
     if n > 1:
-        sizes = ndimage.sum(keep, lbl, index=np.arange(1, n + 1))
-        keep = lbl == (int(np.argmax(sizes)) + 1)
+        sizes = ndimage.sum(solid, lbl, index=np.arange(1, n + 1))
+        solid = lbl == (int(np.argmax(sizes)) + 1)
+    keep = ndimage.binary_dilation(solid, iterations=2) & (h_a > 0.02) & ~below_jaw & ~hood
     m = ndimage.gaussian_filter(keep.astype(float), SEAM_FEATHER) * h_a
 
     # --- head: match its skin tone to the body photo's lighting ------------
@@ -140,6 +148,54 @@ def main() -> None:
     b_lobe = b_chin - LOBE_FRAC * (b_chin - eye_y)
     ears = (yy > b_ear_top - 30) & (yy < b_lobe + 12) & ((xx < bx0 + 16) | (xx > bx1 - 16))
     b_a = b_a * (1 - ndimage.gaussian_filter(ears.astype(float), 1.5))
+
+    # adit5's jawline sits a little higher than adit3's. Rather than show
+    # adit3's jaw underneath (it pokes out past adit5's), stretch adit3's neck
+    # up in each column so it meets adit5's jaw — with the head tilted back you
+    # would see more neck anyway. adit3's own jaw is then hidden.
+    rows = np.arange(h, dtype=float)
+    in_head = m > 0.5
+    head_bottom_col = np.where(in_head.any(axis=0), h - 1 - np.argmax(in_head[::-1], axis=0), -1)
+    face_line = np.where(np.isnan(b_jaw), -1.0, b_jaw + JAW_MARGIN)  # adit3 face is above this
+    b_rgb, b_a = b_rgb.copy(), b_a.copy()
+    src_rgb, src_a = b_rgb.copy(), b_a.copy()
+
+    # neck columns: where adit3 is solid on a row just under its chin
+    neck_row = int(b_chin) + 25
+    cand = (src_a[neck_row] > 0.9) & (head_bottom_col >= 0) & (face_line >= 0)
+    # every other column beside the face: nothing of adit3 above its chin
+    # level (the detected jawline sits inside the real jaw edge near the ears,
+    # so "below the jawline" there is still jaw; the t-shirt starts lower)
+    for x in range(max(bx0 - 25, 0), min(bx1 + 25, w - 1) + 1):
+        if not cand[x]:
+            face_line[x] = b_chin
+    lbl, n = ndimage.label(cand)
+    stretched = 0
+    if n:
+        run = max(range(1, n + 1), key=lambda i: (lbl == i).sum())
+        cols = np.where(lbl == run)[0]
+        # smooth the per-column targets so neighbouring columns stretch alike
+        hb_s = ndimage.gaussian_filter1d(head_bottom_col[cols].astype(float), 4, mode="nearest")
+        nx_s = ndimage.gaussian_filter1d(face_line[cols], 4, mode="nearest")
+        for x, hb, nx in zip(cols, hb_s, nx_s):
+            y0 = int(round(hb)) - 3
+            if y0 >= nx:
+                continue
+            y1 = int(min(nx + NECK_SPAN, h - 1))
+            ys = np.arange(y0, y1)
+            src = nx + (ys - y0) * (y1 - nx) / (y1 - y0)
+            for c in range(3):
+                b_rgb[ys, x, c] = np.interp(src, rows, src_rgb[:, x, c])
+            b_a[ys, x] = np.interp(src, rows, src_a[:, x])
+            face_line[x] = y0 - 1
+            stretched += 1
+    print(f"neck stretched up in {stretched} columns")
+
+    # hide adit3's face wherever it would show outside adit5's head silhouette
+    inside_outline = ndimage.binary_dilation(ndimage.binary_fill_holes(in_head), iterations=1)
+    adit3_face = yy <= face_line[None, :]
+    body_keep = ~adit3_face | inside_outline
+    b_a = b_a * ndimage.gaussian_filter(body_keep.astype(float), 1.0)
 
     # --- composite: head over body -----------------------------------------
     out_a = m + b_a * (1 - m)
