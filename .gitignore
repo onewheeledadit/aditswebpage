@@ -15,3 +15,8 @@ adit5.png
 
 # original glacier photos (web copies live in assets/glaciers/)
 GlacierSub/
+
+# older workshop notebooks (kept locally; the site links only the current one)
+surrogate_models_colab_workshop_v4.ipynb
+surrogate_models_colab_workshop_v5.ipynb
+surrogate_workshop/
