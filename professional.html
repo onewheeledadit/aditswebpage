@@ -11,7 +11,7 @@
   <link rel="stylesheet" href="styles.css" />
   <style>
     .page { position: relative; z-index: 1; flex: 1; max-width: 42rem; margin: 0 auto; padding: clamp(2rem, 6vw, 4rem) 1.25rem 2rem; }
-    .back { display: inline-block; color: var(--ink-soft); text-decoration: none; font-weight: 500; font-size: 1.05rem; padding: 0.4rem 0; margin-bottom: 2rem; border-bottom: 2px solid transparent; }
+    .back { position: sticky; top: 0.75rem; z-index: 5; display: block; width: fit-content; color: var(--ink-soft); text-decoration: none; font-weight: 500; font-size: 1.05rem; padding: 0.65rem 1rem; margin-bottom: 2rem; background: rgba(255, 255, 255, 0.82); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); border: 1px solid var(--ice-300); border-radius: 999px; box-shadow: 0 6px 16px rgba(22, 35, 43, 0.14); }
     .back:hover, .back:focus-visible { color: var(--ink); border-color: var(--warm); }
     .page h1 { font-family: "Bricolage Grotesque", sans-serif; font-weight: 800; text-transform: uppercase; letter-spacing: -0.04em; font-size: clamp(2.5rem, 9vw, 5rem); line-height: 0.9; margin: 0 0 1.5rem; }
     .page p { font-size: clamp(1.05rem, 2.2vw, 1.25rem); line-height: 1.6; color: var(--ink); margin: 0 0 1.25rem; }
